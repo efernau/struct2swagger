@@ -1,7 +1,7 @@
 use crate::quote::ToTokens;
 use proc_macro2::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 use std::iter::FromIterator;
-use syn::{Data, DeriveInput, Fields};
+use syn::{Data, DeriveInput, Fields, Variant};
 
 use crate::Field;
 
@@ -22,12 +22,34 @@ fn get_fields(ast: &DeriveInput) -> Vec<Field> {
                         ty: field_tokens,
                     });
                 }
-
                 fields
             }
-            _ => unimplemented!("Only named struct is implemented. Please send PR!"),
+            _ => unimplemented!("Only named struct & Enum is implemented. Please send PR!"),
         },
-        _ => unimplemented!("Only struct is implemented. Please send PR!"),
+        // Enum support?
+        Data::Enum(e) => {
+            let mut fields = vec![];
+            let mut idents = vec![];
+            for variant in e.variants.iter() {
+                match &variant.fields {
+                    Fields::Named(named_fields) => {}
+                    Fields::Unnamed(unnamed_fields) => {
+                        for field in unnamed_fields.unnamed.iter() {
+                            let mut token_stream = TokenStream::new();
+                            field.ty.to_tokens(&mut token_stream);
+                            let field_tokens: Vec<TokenTree> = token_stream.into_iter().collect();
+                            println!("unneamed enum ident: {:?}", field_tokens);
+                        }
+                    }
+                    Fields::Unit => {
+                        idents.push(variant.ident.to_string());
+                    }
+                }
+            }
+            fields
+        }
+
+        _ => unimplemented!("Only struct & Enum is implemented. Please send PR!"),
     }
 }
 

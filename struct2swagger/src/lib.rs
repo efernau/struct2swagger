@@ -15,6 +15,8 @@ mod impl_data_types;
 mod impl_swagger_trait;
 pub mod swagger_object;
 
+use schemars::{gen::SchemaGenerator, schema_for, JsonSchema};
+
 #[derive(Debug)]
 struct Field {
     name: String,
@@ -22,7 +24,7 @@ struct Field {
 }
 
 pub use impl_swagger_trait::implements_swagger_trait;
-pub use swagger_object::{ParameterIn, ParameterObject};
+pub use swagger_object::{ParameterIn, ParameterObject, SchemaObjectOrReferenceObject};
 
 pub trait JsonSchemaDefinition {
     fn get_json_schema_definition() -> serde_json::Value;
@@ -50,19 +52,24 @@ macro_rules! swagger_add_router {
             None,
             vec![(
                 200 as u16,
-                ($description, $response::get_json_schema_definition()),
+                // ($description, $response::get_json_schema_definition()),
+                ($description, json!(&schema_for!($response).schema)),
+
             )],
         )
+
     }};
     ($swagger_object:expr, "GET", $path:literal, 200, $description: expr, $response:ident) => {{
         $swagger_object.add_route(
             "GET",
             String::from($path),
+            // Check path if we need a ParameterObject
             None,
             None,
             vec![(
                 200 as u16,
-                ($description, $response::get_json_schema_definition()),
+                // ($description, $response::get_json_schema_definition()),
+                ($description, json!(&schema_for!($response).schema)),
             )],
         )
     }};
@@ -74,7 +81,8 @@ macro_rules! swagger_add_router {
             None,
             vec![(
                 200 as u16,
-                ($description, $response::get_json_schema_definition()),
+                // ($description, $response::get_json_schema_definition()),
+                ($description, json!(&schema_for!($response).schema)),
             )],
         )
     }};
@@ -86,6 +94,7 @@ macro_rules! swagger_add_router {
         content_hash_map.insert(
             "application/json".to_owned(),
             MediaTypeObject {
+                // use SchemaObjectOrReferenceObject::ReferenceObject for ref to Schemars, not SchemaObject?
                 schema: Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
                     $req::get_json_schema_definition(),
                 ))),
@@ -102,10 +111,13 @@ macro_rules! swagger_add_router {
                 description: None,
                 content: content_hash_map,
                 required: Some(true),
+                title: Some(json!(&schema_for!($req).schema)["title"].to_string().trim_matches('\"').to_string()),
             }),
             vec![(
                 200 as u16,
-                ($description, $response::get_json_schema_definition()),
+                // ($description, $response::get_json_schema_definition()),
+                ($description, json!(&schema_for!($response).schema)),
+
             )],
         )
     }};

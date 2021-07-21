@@ -15,10 +15,20 @@ extern crate struct2swagger_derive;
 use struct2swagger::swagger_object::SwaggerObject;
 use struct2swagger::{JsonSchemaDefinition, QueryDefinition};
 
-#[derive(Swagger)]
+use schemars::{schema::RootSchema, schema_for, schema_for_value, JsonSchema};
+use serde_json::value::Value;
+
+#[derive(Swagger, JsonSchema)]
 struct SimpleStruct {
     val1: u8,
     val2: String,
+}
+
+#[derive(Swagger, JsonSchema)]
+enum SimpleEnum {
+    A,
+    B,
+    C(SimpleStruct),
 }
 
 const TITLE: &str = "the title";
@@ -27,7 +37,7 @@ const DESCRIPTION: &str = "the description";
 
 #[test]
 fn with_response() {
-    let mut swagger_object = SwaggerObject::new(TITLE, VERSION);
+    let mut swagger_object = SwaggerObject::new(TITLE, VERSION, None);
 
     swagger_add_router!(swagger_object, "GET", "/", 200, DESCRIPTION, SimpleStruct);
 
@@ -64,7 +74,7 @@ fn with_response() {
 
 #[test]
 fn with_body() {
-    let mut swagger_object = SwaggerObject::new(TITLE, VERSION);
+    let mut swagger_object = SwaggerObject::new(TITLE, VERSION, None);
 
     swagger_add_router!(
         swagger_object,
@@ -118,7 +128,7 @@ fn with_body() {
 
 #[test]
 fn with_query_string() {
-    let mut swagger_object = SwaggerObject::new(TITLE, VERSION);
+    let mut swagger_object = SwaggerObject::new(TITLE, VERSION, None);
 
     swagger_add_router!(
         swagger_object,
@@ -177,7 +187,7 @@ fn with_query_string() {
 
 #[test]
 fn many_methods() {
-    let mut swagger_object = SwaggerObject::new(TITLE, VERSION);
+    let mut swagger_object = SwaggerObject::new(TITLE, VERSION, None);
 
     swagger_add_router!(swagger_object, "GET", "/", 200, DESCRIPTION, SimpleStruct);
     swagger_add_router!(
@@ -317,6 +327,72 @@ fn many_methods() {
                         },
                     },
                 },
+            },
+            "components": {
+                "schemas": {},
+            },
+        })
+    );
+}
+
+#[test]
+fn with_enum_body() {
+    let mut swagger_object = SwaggerObject::new(
+        TITLE,
+        VERSION,
+        Some(vec![json!(&schema_for!(SimpleEnum).schema)]),
+    );
+
+    swagger_add_router!(
+        swagger_object,
+        "POST",
+        "/",
+        "request_body",
+        SimpleEnum,
+        200,
+        DESCRIPTION,
+        SimpleEnum
+    );
+
+    let stringified = serde_json::to_string(&swagger_object).unwrap();
+    let values: serde_json::Value = serde_json::from_str(&stringified).unwrap();
+
+    println!("{}", values);
+
+    assert_eq!(
+        values,
+        json!({
+            "openapi": "3.0.0",
+            "info": {
+                "title": TITLE,
+                "version": VERSION,
+            },
+            "paths": {
+                "/": {
+                    "post": {
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": SimpleEnum::get_json_schema_definition(),
+                                },
+                            },
+                            "required":true,
+                        },
+                        "responses": {
+                            "200": {
+                                "description": DESCRIPTION,
+                                "content": {
+                                    "application/json": {
+                                        "schema": SimpleEnum::get_json_schema_definition(),
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            "components": {
+                "schemas": {},
             },
         })
     );

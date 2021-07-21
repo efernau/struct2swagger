@@ -2,6 +2,10 @@ use std::collections::HashMap;
 
 use serde::{Serialize, Serializer};
 
+use schemars::JsonSchema;
+
+use serde_json::value::Value;
+
 #[derive(Debug, Clone)]
 pub enum SwaggerVersion {
     V300,
@@ -101,7 +105,9 @@ pub enum AnyOrExpression {
 #[serde(rename_all = "camelCase")]
 pub struct ComponentsObject {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub schemas: Option<HashMap<String, SchemaObjectOrReferenceObject>>,
+    // pub schemas: Option<HashMap<String, SchemaObjectOrReferenceObject>>,
+    // we need a generic
+    pub schemas: Option<HashMap<String, Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub responses: Option<HashMap<String, ResponseObjectOrReferenceObject>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -166,7 +172,8 @@ pub struct OperationObject {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operation_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub parameters: Option<Vec<ParameterObjectOrReferenceObject>>,
+    // pub parameters: Option<Vec<ParameterObjectOrReferenceObject>>,
+    pub parameters: Option<Vec<Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub request_body: Option<RequestBodyObjectOrReferenceObject>,
     responses: ResponsesObject,
@@ -221,6 +228,9 @@ pub struct RequestBodyObject {
     pub content: HashMap<String, MediaTypeObject>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub required: Option<bool>,
+    // add title
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -255,6 +265,8 @@ pub struct ResponsesObject {
     pub default: Option<ResponseObjectOrReferenceObject>,
     pub responses_per_http_status_codes:
         Option<HashMap<HttpStatusCode, ResponseObjectOrReferenceObject>>,
+    // add title
+    //  pub title : Option<String>,
 }
 impl Serialize for ResponsesObject {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -423,8 +435,8 @@ pub struct SwaggerObject {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub servers: Option<Vec<ServerObject>>,
     pub paths: PathsObject,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub components: Option<ComponentsObject>,
+    // #[serde(skip_serializing_if = "Option::is_none")]
+    pub components: ComponentsObject,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub security: Option<SecurityRequirementObject>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -433,8 +445,37 @@ pub struct SwaggerObject {
     pub external_docs: Option<ExternalDocumentationObject>,
 }
 
+#[derive(JsonSchema)]
+pub struct MyStruct {
+    pub my_int: i32,
+    pub my_bool: bool,
+    pub my_nullable_enum: Option<MyEnum>,
+}
+
+#[derive(JsonSchema)]
+pub enum MyEnum {
+    AA,
+    BB,
+    // StringNewType(String),
+    // StructVariant { floats: Vec<f32> },
+}
+
 impl SwaggerObject {
-    pub fn new(title: &str, version: &str) -> Self {
+    pub fn new(title: &str, version: &str, schemas: Option<Vec<Value>>) -> Self {
+        let mut content_map = HashMap::new();
+        if schemas != None {
+            for schema in schemas.unwrap() {
+                content_map.insert(
+                    schema
+                        .get("title")
+                        .unwrap()
+                        .to_string()
+                        .trim_matches('"')
+                        .to_string(),
+                    schema,
+                );
+            }
+        }
         Self {
             openapi: SwaggerVersion::V300,
             info: InfoObject {
@@ -447,7 +488,19 @@ impl SwaggerObject {
             },
             servers: None,
             paths: HashMap::new(),
-            components: None,
+            // use the components add thr schemas
+            components: ComponentsObject {
+                schemas: Some(content_map),
+                callbacks: None,
+                examples: None,
+                headers: None,
+                links: None,
+                request_bodies: None,
+                responses: None,
+                parameters: None,
+                security_schemes: None,
+            },
+
             security: None,
             tags: None,
             external_docs: None,
@@ -482,15 +535,63 @@ impl SwaggerObject {
                 },
             );
         }
+
+        // if path contains parameters {} or :id return:
+        // parameters:
+        // - name: id
+        //   in: path
+        //   description: User ID
+        //   required: true
+        //   schema:
+        //     type: integer
+        //     format: int64
+
+        let mut new_parameter_objects = None;
+        if path.contains(":") | path.contains("{") {
+            let patterns : &[_] = &[':', '{', '}'];
+            let new_path_name = path.trim_matches(patterns);
+            let parmeter = json!(ParameterObject{
+                name: new_path_name.to_string(),
+                description: Some("Use ID".to_string()),
+                required: Some(true),
+                schema: Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
+                    json!({
+                        "type": "string"
+                    }),
+                ))),
+                allow_empty_value: None,
+                deprecated: None,
+                where_in: ParameterIn::Path,
+                });
+            new_parameter_objects = Some(vec![parmeter]
+            )
+        }
+
         let path_object = self.paths.get_mut(&path).unwrap();
 
         let mut responses_per_http_status_codes = HashMap::new();
         for (status_code, (description, value)) in responses {
             let mut content_map = HashMap::new();
+            println!("value: {}", description);
+            let responses_type_name: String = value.clone()["title"].to_string();
+            let responses_clean_type_name = responses_type_name.trim_matches('\"').to_string();
+            let mut new_schema = None;
+            if responses_clean_type_name == "String".to_string() {
+                new_schema = Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(value)))
+            } else {
+                new_schema = Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
+                    json!({
+                        "$ref": format!("#/components/schemas/{}", responses_clean_type_name)
+                    }),
+                )))
+            };
             content_map.insert(
                 "application/json".to_owned(),
                 MediaTypeObject {
-                    schema: Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(value))),
+                    // schema: Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(value))),
+                    // use $ref components/schemas
+                    //  format!("#/components/schemas/{}", value.get("title").unwrap())
+                    schema: new_schema,
                     example: None,
                     examples: None,
                     encoding: None,
@@ -508,9 +609,32 @@ impl SwaggerObject {
         }
 
         let request_body = match request_body {
-            Some(rq) => Some(RequestBodyObjectOrReferenceObject::RequestBodyObject(
-                Box::new(rq),
-            )),
+            Some(mut rq) => {
+                // add $ref schemas
+                let mut comp_map = HashMap::new();
+                comp_map.insert(
+                    "application/json".to_owned(),
+                    MediaTypeObject {
+                        // schema: Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(value))),
+                        // use $ref components/schemas
+                        //  format!("#/components/schemas/{}", value.get("title").unwrap())
+                        schema: Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
+                            json!({
+                                "$ref":
+                                    format!("#/components/schemas/{}", rq.clone().title.unwrap())
+                            }),
+                        ))),
+                        example: None,
+                        examples: None,
+                        encoding: None,
+                    },
+                );
+                rq.content = comp_map;
+                rq.title = None;
+                Some(RequestBodyObjectOrReferenceObject::RequestBodyObject(
+                    Box::new(rq),
+                ))
+            }
             None => None,
         };
         let operation_object = OperationObject {
@@ -523,7 +647,8 @@ impl SwaggerObject {
             description: None,
             external_docs: None,
             operation_id: None,
-            parameters,
+            // parameters,
+            parameters: new_parameter_objects,
             request_body,
             callbacks: None,
             deprecated: None,
@@ -540,4 +665,19 @@ impl SwaggerObject {
             _ => unimplemented!("Unknown method: Send a PR!"),
         }
     }
+
+    // pub fn add_components(
+    //     self: &mut Self,
+    //     json_sch: Value
+    // ) {
+
+    //         // let mut comp_map = HashMap::new();
+    //         // self.components.clone().unwrap().schemas.unwrap().insert(
+    //         let mut content_map = HashMap::new();
+    //         content_map.insert(
+    //             "Name".to_owned(),
+    //             json_sch);
+
+    //         self.components.schemas = Some(content_map);
+    // }
 }
