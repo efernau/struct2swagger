@@ -228,9 +228,6 @@ pub struct RequestBodyObject {
     pub content: HashMap<String, MediaTypeObject>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub required: Option<bool>,
-    // add title
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -445,20 +442,6 @@ pub struct SwaggerObject {
     pub external_docs: Option<ExternalDocumentationObject>,
 }
 
-#[derive(JsonSchema)]
-pub struct MyStruct {
-    pub my_int: i32,
-    pub my_bool: bool,
-    pub my_nullable_enum: Option<MyEnum>,
-}
-
-#[derive(JsonSchema)]
-pub enum MyEnum {
-    AA,
-    BB,
-    // StringNewType(String),
-    // StructVariant { floats: Vec<f32> },
-}
 
 impl SwaggerObject {
     pub fn new(title: &str, version: &str, schemas: Option<Vec<Value>>) -> Self {
@@ -512,8 +495,8 @@ impl SwaggerObject {
         method: &str,
         path: String,
         parameters: Option<Vec<ParameterObjectOrReferenceObject>>,
-        request_body: Option<RequestBodyObject>,
-        responses: Vec<(HttpStatusCode, (&str, serde_json::Value))>,
+        request_body: Option<(&str, RequestBodyObject)>,
+        responses: Vec<(HttpStatusCode, (&str, &str, serde_json::Value))>,
     ) {
         if !self.paths.contains_key(&path) {
             self.paths.insert(
@@ -548,9 +531,10 @@ impl SwaggerObject {
 
         let mut new_parameter_objects = None;
         if path.contains(":") | path.contains("{") {
-            let patterns : &[_] = &[':', '{', '}'];
-            let new_path_name = path.trim_matches(patterns);
-            let parmeter = json!(ParameterObject{
+            let patterns: &[_] = &[':', '{', '}'];
+            let split_path: Vec<&str> = path.split('/').collect();
+            let new_path_name = split_path.last().unwrap().trim_matches(patterns);
+            let parmeter = json!(ParameterObject {
                 name: new_path_name.to_string(),
                 description: Some("Use ID".to_string()),
                 required: Some(true),
@@ -562,29 +546,27 @@ impl SwaggerObject {
                 allow_empty_value: None,
                 deprecated: None,
                 where_in: ParameterIn::Path,
-                });
-            new_parameter_objects = Some(vec![parmeter]
-            )
+            });
+            new_parameter_objects = Some(vec![parmeter])
         }
 
         let path_object = self.paths.get_mut(&path).unwrap();
 
         let mut responses_per_http_status_codes = HashMap::new();
-        for (status_code, (description, value)) in responses {
+        for (status_code, (description, title, mut value)) in responses {
             let mut content_map = HashMap::new();
-            println!("value: {}", description);
-            let responses_type_name: String = value.clone()["title"].to_string();
-            let responses_clean_type_name = responses_type_name.trim_matches('\"').to_string();
-            let mut new_schema = None;
-            if responses_clean_type_name == "String".to_string() {
-                new_schema = Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(value)))
+
+            let mut new_schema;
+            if title == "String".to_string() {
+                new_schema = Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
+                    value.clone(),
+                )))
             } else {
                 new_schema = Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
-                    json!({
-                        "$ref": format!("#/components/schemas/{}", responses_clean_type_name)
-                    }),
+                    json!({ "$ref": format!("#/components/schemas/{}", title) }),
                 )))
             };
+
             content_map.insert(
                 "application/json".to_owned(),
                 MediaTypeObject {
@@ -619,20 +601,16 @@ impl SwaggerObject {
                         // use $ref components/schemas
                         //  format!("#/components/schemas/{}", value.get("title").unwrap())
                         schema: Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
-                            json!({
-                                "$ref":
-                                    format!("#/components/schemas/{}", rq.clone().title.unwrap())
-                            }),
+                            json!({ "$ref": format!("#/components/schemas/{}", rq.0) }),
                         ))),
                         example: None,
                         examples: None,
                         encoding: None,
                     },
                 );
-                rq.content = comp_map;
-                rq.title = None;
+                rq.1.content = comp_map;
                 Some(RequestBodyObjectOrReferenceObject::RequestBodyObject(
-                    Box::new(rq),
+                    Box::new(rq.1),
                 ))
             }
             None => None,
@@ -665,19 +643,4 @@ impl SwaggerObject {
             _ => unimplemented!("Unknown method: Send a PR!"),
         }
     }
-
-    // pub fn add_components(
-    //     self: &mut Self,
-    //     json_sch: Value
-    // ) {
-
-    //         // let mut comp_map = HashMap::new();
-    //         // self.components.clone().unwrap().schemas.unwrap().insert(
-    //         let mut content_map = HashMap::new();
-    //         content_map.insert(
-    //             "Name".to_owned(),
-    //             json_sch);
-
-    //         self.components.schemas = Some(content_map);
-    // }
 }

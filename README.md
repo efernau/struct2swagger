@@ -2,6 +2,8 @@
 
 Utilities for generating OpenAPI Specification from your structures
 
+This fork implement more types like enums by using [Schemars](https://crates.io/crates/schemars) instead of the own struct2swagger serialization.
+Also has support for path operations like /users/{id}: and use of $ref to schema instead of schema
 ## Install
 ```
 cargo add struct2swagger_derive struct2swagger
@@ -19,22 +21,35 @@ extern crate struct2swagger;
 extern crate serde_json;
 
 use struct2swagger::{JsonSchemaDefinition, QueryDefinition, swagger_object::SwaggerObject};
-use serde_json::Result;
+use serde_json::{ Result, value::Value};
 
-#[derive(Deserialize, Swagger)]
+
+#[derive(Deserialize, Swagger, JsonSchema)]
 pub struct Who {
     pub name: Option<String>,
+    pub my_enum: HelloWorldEnum,
 }
-#[derive(Serialize, Swagger)]
+#[derive(Deserialize, Swagger, JsonSchema)]
 pub struct HelloWorldResponse {
     pub say: String,
+}
+#[derive(Deserialize, Swagger, JsonSchema)]
+pub enum HelloWorldEnum {
+    AA,
+    BB,
+    CC,
 }
 
 fn get_openapi_spec() -> String {
   let mut swagger_object = SwaggerObject::new(
-    "the webserver name", // title
-    "1.0.0" // version
-  );
+        "the webserver name", // title
+        "1.0.0" // version
+        Some(vec![
+            json!(&schema_for!(SimpleStruct).schema),
+            json!(&schema_for!(Credential).schema),
+            json!(&schema_for!(AvailabilityStatus).schema),
+        ]),
+    );
 
   swagger_add_router!(
       swagger_object, // obj

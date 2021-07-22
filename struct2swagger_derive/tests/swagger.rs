@@ -68,6 +68,9 @@ fn with_response() {
                     },
                 },
             },
+            "components": {
+                "schemas": {},
+            },  
         })
     );
 }
@@ -121,6 +124,9 @@ fn with_body() {
                         },
                     },
                 },
+            },
+            "components": {
+                "schemas": {},
             },
         })
     );
@@ -180,6 +186,9 @@ fn with_query_string() {
                         },
                     },
                 },
+            },
+            "components": {
+                "schemas": {},
             },
         })
     );
@@ -356,8 +365,6 @@ fn with_enum_body() {
 
     let stringified = serde_json::to_string(&swagger_object).unwrap();
     let values: serde_json::Value = serde_json::from_str(&stringified).unwrap();
-
-    println!("{}", values);
 
     assert_eq!(
         values,

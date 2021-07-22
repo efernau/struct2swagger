@@ -53,7 +53,7 @@ macro_rules! swagger_add_router {
             vec![(
                 200 as u16,
                 // ($description, $response::get_json_schema_definition()),
-                ($description, json!(&schema_for!($response).schema)),
+                ($description, &json!(&schema_for!($response).schema)["title"].to_string().trim_matches('\"').to_string(), json!(&schema_for!($response).schema)),
 
             )],
         )
@@ -69,7 +69,7 @@ macro_rules! swagger_add_router {
             vec![(
                 200 as u16,
                 // ($description, $response::get_json_schema_definition()),
-                ($description, json!(&schema_for!($response).schema)),
+                ($description, &json!(&schema_for!($response).schema)["title"].to_string().trim_matches('\"').to_string(), json!(&schema_for!($response).schema)),
             )],
         )
     }};
@@ -82,7 +82,7 @@ macro_rules! swagger_add_router {
             vec![(
                 200 as u16,
                 // ($description, $response::get_json_schema_definition()),
-                ($description, json!(&schema_for!($response).schema)),
+                ($description, &json!(&schema_for!($response).schema)["title"].to_string().trim_matches('\"').to_string(), json!(&schema_for!($response).schema)),
             )],
         )
     }};
@@ -107,16 +107,18 @@ macro_rules! swagger_add_router {
             $method,
             String::from($path),
             None,
-            Some(RequestBodyObject {
-                description: None,
-                content: content_hash_map,
-                required: Some(true),
-                title: Some(json!(&schema_for!($req).schema)["title"].to_string().trim_matches('\"').to_string()),
-            }),
+            Some(
+                (&json!(&schema_for!($req).schema)["title"].to_string().trim_matches('\"').to_string(),
+                RequestBodyObject {
+                    description: None,
+                    content: content_hash_map,
+                    required: Some(true),
+                })
+            ),
             vec![(
                 200 as u16,
                 // ($description, $response::get_json_schema_definition()),
-                ($description, json!(&schema_for!($response).schema)),
+                ($description, &json!(&schema_for!($response).schema)["title"].to_string().trim_matches('\"').to_string(), json!(&schema_for!($response).schema)),
 
             )],
         )
