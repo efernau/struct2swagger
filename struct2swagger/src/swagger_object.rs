@@ -447,15 +447,17 @@ impl SwaggerObject {
     pub fn new(title: &str, version: &str, schemas: Option<Vec<Value>>) -> Self {
         let mut content_map = HashMap::new();
         if schemas != None {
-            for schema in schemas.unwrap() {
+            for mut schema in schemas.unwrap() {
+                // This is a ugly $ref replace, better use Schemars SchemaGenerator?.
+                schema["$ref"] = json!(serde_json::to_string(&schema["$ref"]).unwrap().replace("/definitions/", "/components/schemas/")); 
                 content_map.insert(
                     schema
                         .get("title")
                         .unwrap()
                         .to_string()
                         .trim_matches('"')
-                        .to_string(),
-                    schema,
+                        .to_string(), // need the name
+                    schema
                 );
             }
         }
@@ -471,7 +473,7 @@ impl SwaggerObject {
             },
             servers: None,
             paths: HashMap::new(),
-            // use the components add thr schemas
+            // use the components add the schemas
             components: ComponentsObject {
                 schemas: Some(content_map),
                 callbacks: None,

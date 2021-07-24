@@ -45,9 +45,9 @@ fn get_openapi_spec() -> String {
         "the webserver name", // title
         "1.0.0" // version
         Some(vec![
-            json!(&schema_for!(SimpleStruct).schema),
-            json!(&schema_for!(Credential).schema),
-            json!(&schema_for!(AvailabilityStatus).schema),
+            json!(&schema_for!(Who).schema),
+            json!(&schema_for!(HelloWorldResponse).schema),
+            json!(&schema_for!(HelloWorldEnum).schema),
         ]),
     );
 
@@ -61,9 +61,9 @@ fn get_openapi_spec() -> String {
       HelloWorldResponse // struct in output
   );
 
-  let json = serde_json::to_string(&address).unwrap();
+  let stringified = serde_json::to_string(&swagger_object).unwrap();
 
-  json
+  stringified
 }
 ```
 
