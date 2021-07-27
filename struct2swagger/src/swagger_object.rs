@@ -449,7 +449,9 @@ impl SwaggerObject {
         if schemas != None {
             for mut schema in schemas.unwrap() {
                 // This is a ugly $ref replace, better use Schemars SchemaGenerator?.
-                schema["$ref"] = json!(serde_json::to_string(&schema["$ref"]).unwrap().replace("/definitions/", "/components/schemas/")); 
+                if !schema["$ref"].is_null() { 
+                    schema["$ref"] = json!(serde_json::to_string(&schema["$ref"]).unwrap().replace("/definitions/", "/components/schemas/"))
+                };
                 content_map.insert(
                     schema
                         .get("title")

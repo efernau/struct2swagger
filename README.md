@@ -3,7 +3,7 @@
 Utilities for generating OpenAPI Specification from your structures
 
 This fork implement more types like enums by using [Schemars](https://crates.io/crates/schemars) instead of the own struct2swagger serialization.
-Also has support for path operations like /users/{id}: and use of $ref to schema instead of schema
+Also has support for path operations like /users/{id}: and use of $ref to schemas instead of schema
 ## Install
 ```
 cargo add struct2swagger_derive struct2swagger

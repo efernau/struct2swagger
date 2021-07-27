@@ -55,7 +55,18 @@ macro_rules! impl_json_schema_definition {
             }
         }
     };
+    ($rt:ty, "uuid") => {
+        impl JsonSchemaDefinition for $rt {
+            fn get_json_schema_definition() -> serde_json::Value {
+                json!({
+                    "type": "uuid",
+                })
+            }
+        }
+    };
+    
 }
+impl_json_schema_definition!(uuid::Uuid, "uuid");
 impl_json_schema_definition!(i8, "integer", std::i8::MIN, std::i8::MAX);
 impl_json_schema_definition!(i16, "integer", std::i16::MIN, std::i16::MAX);
 impl_json_schema_definition!(i32, "integer", std::i32::MIN, std::i32::MAX);

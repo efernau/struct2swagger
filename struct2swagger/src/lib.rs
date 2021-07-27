@@ -39,16 +39,17 @@ macro_rules! swagger_add_router {
         $swagger_object.add_route(
             "GET",
             String::from($path),
-            Some(
-                <$query_params>::get_query_definitions()
-                    .into_iter()
-                    .map(|p| {
-                        $crate::swagger_object::ParameterObjectOrReferenceObject::ParameterObject(
-                            Box::new(p),
-                        )
-                    })
-                    .collect(),
-            ),
+            None, // TODO
+            // Some(
+            //     <$query_params>::get_query_definitions()
+            //         .into_iter()
+            //         .map(|p| {
+            //             $crate::swagger_object::ParameterObjectOrReferenceObject::ParameterObject(
+            //                 Box::new(p),
+            //             )
+            //         })
+            //         .collect(),
+            // ),
             None,
             vec![(
                 200 as u16,
@@ -95,9 +96,10 @@ macro_rules! swagger_add_router {
             "application/json".to_owned(),
             MediaTypeObject {
                 // use SchemaObjectOrReferenceObject::ReferenceObject for ref to Schemars, not SchemaObject?
-                schema: Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
-                    $req::get_json_schema_definition(),
-                ))),
+                schema: None, // TODO
+                // Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
+                //     $req::get_json_schema_definition(),
+                // ))),
                 example: None,
                 examples: None,
                 encoding: None,
