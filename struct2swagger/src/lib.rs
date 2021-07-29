@@ -95,8 +95,11 @@ macro_rules! swagger_add_router {
         content_hash_map.insert(
             "application/json".to_owned(),
             MediaTypeObject {
+                // TODO
                 // use SchemaObjectOrReferenceObject::ReferenceObject for ref to Schemars, not SchemaObject?
-                schema: None, // TODO
+                schema: Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
+                    json!(&schema_for!($req).schema),
+                ))),
                 // Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
                 //     $req::get_json_schema_definition(),
                 // ))),

@@ -449,9 +449,9 @@ impl SwaggerObject {
         if schemas != None {
             for mut schema in schemas.unwrap() {
                 // This is a ugly $ref replace, better use Schemars SchemaGenerator?.
-                if !schema["$ref"].is_null() { 
-                    schema["$ref"] = json!(serde_json::to_string(&schema["$ref"]).unwrap().replace("/definitions/", "/components/schemas/"))
-                };
+                 if let Some(schema_ref) = schema.get("$ref") { 
+                    schema["$ref"] = json!(serde_json::to_string(&schema_ref).unwrap().replace("/definitions/", "/components/schemas/"));
+                 };
                 content_map.insert(
                     schema
                         .get("title")
@@ -537,7 +537,8 @@ impl SwaggerObject {
         if path.contains(":") | path.contains("{") {
             let patterns: &[_] = &[':', '{', '}'];
             let split_path: Vec<&str> = path.split('/').collect();
-            let new_path_name = split_path.last().unwrap().trim_matches(patterns);
+            let untrim_path_name = split_path.last().unwrap().to_string();
+            let new_path_name = untrim_path_name.trim_matches(patterns);
             let parmeter = json!(ParameterObject {
                 name: new_path_name.to_string(),
                 description: Some("Use ID".to_string()),
