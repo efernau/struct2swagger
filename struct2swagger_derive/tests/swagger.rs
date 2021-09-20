@@ -70,7 +70,7 @@ fn with_response() {
             },
             "components": {
                 "schemas": {},
-            },  
+            },
         })
     );
 }

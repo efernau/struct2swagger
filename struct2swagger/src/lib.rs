@@ -35,8 +35,9 @@ pub trait QueryDefinition {
 
 #[macro_export]
 macro_rules! swagger_add_router {
-    ($swagger_object:expr, "GET", $path:literal, $query_params: ident, 200, $description: expr, $response:ident) => {{
+    ($swagger_object:expr, $secure:ident, "GET", $path:literal, $query_params: ident, 200, $description: expr, $response:ident) => {{
         $swagger_object.add_route(
+            $secure,
             "GET",
             String::from($path),
             None, // TODO
@@ -60,8 +61,9 @@ macro_rules! swagger_add_router {
         )
 
     }};
-    ($swagger_object:expr, "GET", $path:literal, 200, $description: expr, $response:ident) => {{
+    ($swagger_object:expr, $secure:ident, "GET", $path:literal, 200, $description: expr, $response:ident) => {{
         $swagger_object.add_route(
+            $secure,
             "GET",
             String::from($path),
             // Check path if we need a ParameterObject
@@ -74,8 +76,9 @@ macro_rules! swagger_add_router {
             )],
         )
     }};
-    ($swagger_object:expr, "DELETE", $path:literal, 200, $description: expr, $response:ident) => {{
+    ($swagger_object:expr, $secure:ident, "DELETE", $path:literal, 200, $description: expr, $response:ident) => {{
         $swagger_object.add_route(
+            $secure,
             "DELETE",
             String::from($path),
             None,
@@ -87,7 +90,7 @@ macro_rules! swagger_add_router {
             )],
         )
     }};
-    ($swagger_object:expr, $method:literal, $path:literal, "request_body", $req: ident, 200, $description: expr, $response:ident) => {{
+    ($swagger_object:expr,$secure:ident, $method:literal, $path:literal, "request_body", $req: ident, 200, $description: expr, $response:ident) => {{
         use struct2swagger::swagger_object::{
             MediaTypeObject, RequestBodyObject, SchemaObjectOrReferenceObject,
         };
@@ -109,6 +112,7 @@ macro_rules! swagger_add_router {
             },
         );
         $swagger_object.add_route(
+            $secure,
             $method,
             String::from($path),
             None,

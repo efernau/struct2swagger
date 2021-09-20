@@ -64,7 +64,7 @@ macro_rules! impl_json_schema_definition {
             }
         }
     };
-    
+
 }
 impl_json_schema_definition!(uuid::Uuid, "uuid");
 impl_json_schema_definition!(i8, "integer", std::i8::MIN, std::i8::MAX);

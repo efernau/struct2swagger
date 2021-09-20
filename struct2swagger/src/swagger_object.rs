@@ -390,13 +390,17 @@ pub struct SecuritySchemeObject {
     pub r#type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    pub name: String,
-    pub r#in: ParameterIn,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#in: Option<ParameterIn>,
     pub scheme: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bearer_format: Option<String>,
-    pub flows: OAuthFlowsObject,
-    pub open_id_connect_url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flows: Option<OAuthFlowsObject>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub open_id_connect_url: Option<String>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -422,7 +426,7 @@ pub struct OAuthFlowObject {
     pub scopes: HashMap<String, String>,
 }
 
-type SecurityRequirementObject = HashMap<String, String>;
+type SecurityRequirementObject = HashMap<String, Value>;
 
 #[derive(Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -462,11 +466,15 @@ impl SwaggerObject {
                 gen_schema = gen_schema.replace(r#""type":["integer"]"#, r#""type":"integer""#);
                 gen_schema = gen_schema.replace(r#""type":["number"]"#, r#""type":"number""#);
                 // ip fix ;(
-                gen_schema = gen_schema.replace(r##"{"$ref":"#/components/schemas/Ipv6Net"}"##,
-                                                 r#"{"type":"string"}"#);
-                gen_schema = gen_schema.replace(r##"{"$ref":"#/components/schemas/IpNet"}"##,
-                                                 r#"{"type":"string"}"#);                                 
-               
+                gen_schema = gen_schema.replace(
+                    r##"{"$ref":"#/components/schemas/Ipv6Net"}"##,
+                    r#"{"type":"string"}"#,
+                );
+                gen_schema = gen_schema.replace(
+                    r##"{"$ref":"#/components/schemas/IpNet"}"##,
+                    r#"{"type":"string"}"#,
+                );
+
                 let new_schema = serde_json::from_str(&gen_schema).unwrap();
 
                 content_map.insert(
@@ -480,6 +488,24 @@ impl SwaggerObject {
                 );
             }
         }
+
+        // set Auth
+        let mut auth = HashMap::new();
+        auth.insert(
+            "bearerAuth".to_string(),
+            SecuritySchemeObjectOrReferenceObject::SecuritySchemeObject(Box::new(
+                SecuritySchemeObject {
+                    r#type: "http".to_string(),
+                    description: Some("Bearer Authentication See RFC 6750".to_string()),
+                    name: None,
+                    r#in: None,
+                    scheme: "bearer".to_string(),
+                    bearer_format: Some("JWT".to_string()),
+                    flows: None,
+                    open_id_connect_url: None,
+                },
+            )),
+        );
         Self {
             openapi: SwaggerVersion::V300,
             info: InfoObject {
@@ -502,7 +528,7 @@ impl SwaggerObject {
                 request_bodies: None,
                 responses: None,
                 parameters: None,
-                security_schemes: None,
+                security_schemes: Some(auth),
             },
 
             security: None,
@@ -513,6 +539,7 @@ impl SwaggerObject {
 
     pub fn add_route(
         self: &mut Self,
+        secure: bool,
         method: &str,
         path: String,
         parameters: Option<Vec<ParameterObjectOrReferenceObject>>,
@@ -673,7 +700,11 @@ impl SwaggerObject {
             request_body,
             callbacks: None,
             deprecated: None,
-            security: None,
+            security: if secure {
+                Some(vec![HashMap::from([("bearerAuth".to_string(), json!([]))])])
+            } else {
+                None
+            },
             servers: None,
         };
 
