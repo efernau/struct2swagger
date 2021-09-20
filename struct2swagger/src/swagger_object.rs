@@ -442,16 +442,33 @@ pub struct SwaggerObject {
     pub external_docs: Option<ExternalDocumentationObject>,
 }
 
-
 impl SwaggerObject {
     pub fn new(title: &str, version: &str, schemas: Option<Vec<Value>>) -> Self {
         let mut content_map = HashMap::new();
         if schemas != None {
-            for mut schema in schemas.unwrap() {
+            for schema in schemas.unwrap() {
                 // This is a ugly $ref replace, better use Schemars SchemaGenerator?.
-                 if let Some(schema_ref) = schema.get("$ref") { 
-                    schema["$ref"] = json!(serde_json::to_string(&schema_ref).unwrap().replace("/definitions/", "/components/schemas/"));
-                 };
+                let mut gen_schema =
+                    format!("{}", schema).replace(r#"#/definitions/"#, r#"#/components/schemas/"#);
+                // v3.1.0 allow null, we use v3.0.0 and remove null and replace with nullable: true
+                gen_schema = gen_schema.replace(r#","null"]"#, r#"],"nullable":true"#);
+                gen_schema = gen_schema.replace(r#","null"]"#, r#"],"nullable":true"#);
+                gen_schema = gen_schema.replace(r#",{"type":"null"}]"#, r#"],"nullable":true"#);
+                // normalisation
+                gen_schema = gen_schema.replace(r#""type":["array"]"#, r#""type":"array""#);
+                gen_schema = gen_schema.replace(r#""type":["object"]"#, r#""type":"object""#);
+                gen_schema = gen_schema.replace(r#""type":["string"]"#, r#""type":"string""#);
+                gen_schema = gen_schema.replace(r#""type":["boolean"]"#, r#""type":"boolean""#);
+                gen_schema = gen_schema.replace(r#""type":["integer"]"#, r#""type":"integer""#);
+                gen_schema = gen_schema.replace(r#""type":["number"]"#, r#""type":"number""#);
+                // ip fix ;(
+                gen_schema = gen_schema.replace(r##"{"$ref":"#/components/schemas/Ipv6Net"}"##,
+                                                 r#"{"type":"string"}"#);
+                gen_schema = gen_schema.replace(r##"{"$ref":"#/components/schemas/IpNet"}"##,
+                                                 r#"{"type":"string"}"#);                                 
+               
+                let new_schema = serde_json::from_str(&gen_schema).unwrap();
+
                 content_map.insert(
                     schema
                         .get("title")
@@ -459,7 +476,7 @@ impl SwaggerObject {
                         .to_string()
                         .trim_matches('"')
                         .to_string(), // need the name
-                    schema
+                    new_schema,
                 );
             }
         }
@@ -533,26 +550,36 @@ impl SwaggerObject {
         //     type: integer
         //     format: int64
 
-        let mut new_parameter_objects = None;
-        if path.contains(":") | path.contains("{") {
+        // generate the paramter object from url {}
+        let mut new_parameter_objects: Option<Vec<Value>> = None;
+        if path.contains("{") {
             let patterns: &[_] = &[':', '{', '}'];
-            let split_path: Vec<&str> = path.split('/').collect();
-            let untrim_path_name = split_path.last().unwrap().to_string();
-            let new_path_name = untrim_path_name.trim_matches(patterns);
-            let parmeter = json!(ParameterObject {
-                name: new_path_name.to_string(),
-                description: Some("Use ID".to_string()),
-                required: Some(true),
-                schema: Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
-                    json!({
-                        "type": "string"
-                    }),
-                ))),
-                allow_empty_value: None,
-                deprecated: None,
-                where_in: ParameterIn::Path,
-            });
-            new_parameter_objects = Some(vec![parmeter])
+            let split_paths: Vec<&str> = path.split('/').collect();
+            for data_path in split_paths {
+                if data_path.contains("{") {
+                    let new_path_name = data_path.trim_matches(patterns);
+                    let parmeter = json!(ParameterObject {
+                        name: new_path_name.to_string(),
+                        description: Some(format!("use {} parameter", &new_path_name)),
+                        required: Some(true),
+                        schema: Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
+                            json!({
+                                "type": "string"
+                            }),
+                        ))),
+                        allow_empty_value: None,
+                        deprecated: None,
+                        where_in: ParameterIn::Path,
+                    });
+                    match new_parameter_objects {
+                        Some(mut data_parameter) => {
+                            data_parameter.push(parmeter);
+                            new_parameter_objects = Some(data_parameter)
+                        }
+                        None => new_parameter_objects = Some(vec![parmeter]),
+                    };
+                }
+            }
         }
 
         let path_object = self.paths.get_mut(&path).unwrap();
@@ -599,15 +626,26 @@ impl SwaggerObject {
             Some(mut rq) => {
                 // add $ref schemas
                 let mut comp_map = HashMap::new();
+                let mut new_schema;
+                if rq.0 == "String".to_string() {
+                    new_schema = Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
+                        json! ({
+                            "title": "sting",
+                            "type": "string"
+                        }),
+                    )))
+                } else {
+                    new_schema = Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
+                        json!({ "$ref": format!("#/components/schemas/{}", rq.0) }),
+                    )))
+                };
                 comp_map.insert(
                     "application/json".to_owned(),
                     MediaTypeObject {
                         // schema: Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(value))),
                         // use $ref components/schemas
                         //  format!("#/components/schemas/{}", value.get("title").unwrap())
-                        schema: Some(SchemaObjectOrReferenceObject::SchemaObject(Box::new(
-                            json!({ "$ref": format!("#/components/schemas/{}", rq.0) }),
-                        ))),
+                        schema: new_schema,
                         example: None,
                         examples: None,
                         encoding: None,
