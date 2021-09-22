@@ -685,6 +685,8 @@ impl SwaggerObject {
             }
             None => None,
         };
+        let mut sec_map = HashMap::new();
+        sec_map.insert("bearerAuth".to_string(), json!([]));
         let operation_object = OperationObject {
             responses: ResponsesObject {
                 default: None,
@@ -700,11 +702,7 @@ impl SwaggerObject {
             request_body,
             callbacks: None,
             deprecated: None,
-            security: if secure {
-                Some(vec![HashMap::from([("bearerAuth".to_string(), json!([]))])])
-            } else {
-                None
-            },
+            security: if secure { Some(vec![sec_map]) } else { None },
             servers: None,
         };
 
