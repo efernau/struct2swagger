@@ -434,12 +434,6 @@ pub struct SwaggerObject {
     pub openapi: SwaggerVersion,
     pub info: InfoObject,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub host: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub base_path: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub schemes: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub servers: Option<Vec<ServerObject>>,
     pub paths: PathsObject,
     // #[serde(skip_serializing_if = "Option::is_none")]
@@ -453,7 +447,13 @@ pub struct SwaggerObject {
 }
 
 impl SwaggerObject {
-    pub fn new(title: &str, version: &str, host: &str, base_path: &str, schemes: Vec<String>, description: &str, schemas: Option<Vec<Value>>) -> Self {
+    pub fn new(
+        title: &str,
+        version: &str,
+        servers: Vec<String>,
+        description: &str,
+        schemas: Option<Vec<Value>>,
+    ) -> Self {
         let mut content_map = HashMap::new();
         if schemas != None {
             for schema in schemas.unwrap() {
@@ -495,6 +495,16 @@ impl SwaggerObject {
             }
         }
 
+        // Servers
+        let mut new_servers = vec![];
+        for server in servers {
+            new_servers.push(ServerObject {
+                url: server,
+                description: None,
+                variables: None,
+            })
+        }
+
         // set Auth
         let mut auth = HashMap::new();
         auth.insert(
@@ -522,10 +532,7 @@ impl SwaggerObject {
                 contact: None,
                 license: None,
             },
-            host: Some(host.to_owned().to_string()),
-            base_path: Some(base_path.to_owned()),
-            schemes: Some(schemes),
-            servers: None,
+            servers: Some(new_servers),
             paths: HashMap::new(),
             // use the components add the schemas
             components: ComponentsObject {
@@ -549,6 +556,7 @@ impl SwaggerObject {
     pub fn add_route(
         self: &mut Self,
         secure: bool,
+        tag: &str,
         method: &str,
         path: String,
         parameters: Option<Vec<ParameterObjectOrReferenceObject>>,
@@ -696,12 +704,14 @@ impl SwaggerObject {
         };
         let mut sec_map = HashMap::new();
         sec_map.insert("bearerAuth".to_string(), json!([]));
+        
+
         let operation_object = OperationObject {
             responses: ResponsesObject {
                 default: None,
                 responses_per_http_status_codes: Some(responses_per_http_status_codes),
             },
-            tags: None,
+            tags: Some(vec![tag.to_string()]),
             summary: None,
             description: None,
             external_docs: None,
