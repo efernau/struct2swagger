@@ -434,6 +434,12 @@ pub struct SwaggerObject {
     pub openapi: SwaggerVersion,
     pub info: InfoObject,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schemes: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub servers: Option<Vec<ServerObject>>,
     pub paths: PathsObject,
     // #[serde(skip_serializing_if = "Option::is_none")]
@@ -447,7 +453,7 @@ pub struct SwaggerObject {
 }
 
 impl SwaggerObject {
-    pub fn new(title: &str, version: &str, schemas: Option<Vec<Value>>) -> Self {
+    pub fn new(title: &str, version: &str, host: &str, base_path: &str, schemes: Vec<String>, description: &str, schemas: Option<Vec<Value>>) -> Self {
         let mut content_map = HashMap::new();
         if schemas != None {
             for schema in schemas.unwrap() {
@@ -511,11 +517,14 @@ impl SwaggerObject {
             info: InfoObject {
                 title: title.to_owned(),
                 version: version.to_owned(),
-                description: None,
+                description: Some(description.to_owned()),
                 terms_of_service: None,
                 contact: None,
                 license: None,
             },
+            host: Some(host.to_owned().to_string()),
+            base_path: Some(base_path.to_owned()),
+            schemes: Some(schemes),
             servers: None,
             paths: HashMap::new(),
             // use the components add the schemas
